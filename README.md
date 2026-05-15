@@ -1,65 +1,56 @@
 # Tweet Sentiment & COVID-19 Disease Detection
 
-Tái tạo pipeline và kết quả nghiên cứu bài báo "Towards using Tweet sentiment for infectious disease detection" (PLOS ONE, 2025).
+Tái tạo pipeline nghiên cứu bài báo "Towards using Tweet sentiment for infectious disease detection" (PLOS ONE, 2025). Hệ thống đi kèm với một **Web Dashboard giao diện cực đẹp** cho phép bạn thao tác, phân tích và xem biểu đồ tương quan trực quan.
 
-## Yêu cầu hệ thống
+## Cấu trúc Hệ thống
+- **`src/`**: Chứa các scripts xử lý dữ liệu, phân tích sentiment và vẽ bản đồ.
+- **`api/`**: FastAPI backend để kích hoạt các scripts và phục vụ ảnh.
+- **`web/`**: Vite + React frontend (Dark mode, Glassmorphism).
+- **`data/` & `outputs/`**: Nơi chứa raw data và kết quả (ảnh, csv).
+
+## Yêu cầu
 - Python 3.9+
-- Khuyên dùng môi trường ảo (virtual environment)
+- Node.js 18+ (để chạy giao diện Vite)
 
-## Cài đặt
+## Hướng dẫn Khởi chạy (Chỉ 2 bước)
+
+### Bước 1: Khởi động Backend (Python FastAPI)
+Mở một terminal mới và chạy:
+
 ```bash
+# Tạo môi trường ảo (nếu chưa có)
 python -m venv venv
 
-# Windows
+# Kích hoạt môi trường
+# Trên Windows:
 venv\Scripts\activate
-
-# MacOS/Linux
+# Trên MacOS/Linux:
 source venv/bin/activate
 
-# Cài đặt thư viện
+# Cài đặt thư viện pipeline & backend
 pip install -r requirements.txt
+pip install -r api_requirements.txt
+
+# Khởi chạy server
+python api/main.py
 ```
+*Server sẽ chạy ở địa chỉ: `http://localhost:8000`*
 
-## Cách chạy
+### Bước 2: Khởi động Frontend (React)
+Mở một terminal **thứ hai** và chạy:
 
-### 1. Tạo dữ liệu giả lập (Mock data)
-Nếu bạn chưa có dữ liệu thật (tweets, USAFacts), chạy script này để tạo mẫu dữ liệu. Script cũng sẽ tự động tải file geojson các county của Mỹ có cơ chế caching.
 ```bash
-python src/00_generate_sample_data.py
+cd web
+npm install
+npm run dev
 ```
+*Giao diện sẽ hiển thị ở địa chỉ (thường là): `http://localhost:5173`*
 
-### 2. Tính điểm Sentiment
-```bash
-python src/01_compute_sentiment.py
-```
+---
 
-### 3. Tiền xử lý dữ liệu ca bệnh (COVID Cases)
-```bash
-python src/02_prepare_cases.py
-```
-
-### 4. Gộp dữ liệu Sentiment và Cases
-Bạn có thể chọn group dữ liệu theo ngày (`daily`) hoặc tuần (`weekly`). Tuần sẽ bắt đầu từ thứ Hai.
-```bash
-python src/03_merge_data.py --agg-level daily
-# hoặc
-python src/03_merge_data.py --agg-level weekly
-```
-
-### 5. Tính toán Correlation
-Tính toán Pearson correlation (Global, Temporal, Spatial, Spatiotemporal).
-```bash
-python src/04_correlation.py --agg-level daily
-```
-
-### 6. Vẽ biểu đồ Temporal Correlation
-```bash
-python src/05_plot_temporal.py
-```
-
-### 7. Vẽ bản đồ Spatial Correlation
-```bash
-python src/06_plot_map.py
-```
-
-Tất cả kết quả sẽ được lưu vào thư mục `outputs/`.
+## Cách sử dụng Dashboard
+1. Truy cập vào giao diện web (`http://localhost:5173`).
+2. Chọn mức độ aggregate (Daily hoặc Weekly) ở thanh bên trái.
+3. Bấm **"Run Pipeline"**. 
+4. Hãy chờ vài phút (có spinner xoay xoay). Quá trình này sẽ ngầm gọi các bước: tạo mock data, parse thời gian, tính toán sentiment, merge cases và vẽ đồ thị.
+5. Sau khi kết thúc, điểm **Global Correlation**, biểu đồ **Temporal** và bản đồ **Spatial** (trên lục địa Mỹ) sẽ hiện ra cực kỳ lung linh.

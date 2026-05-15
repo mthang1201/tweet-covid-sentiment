@@ -1,0 +1,86 @@
+import os
+import subprocess
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# Cấu hình CORS để frontend React có thể gọi API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Trong môi trường dev, cho phép tất cả
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(BASE_DIR, 'outputs')
+SRC_DIR = os.path.join(BASE_DIR, 'src')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Mount thư mục outputs để frontend có thể tải ảnh trực tiếp
+app.mount("/static", StaticFiles(directory=OUTPUT_DIR), name="static")
+
+class RunPipelineRequest(BaseModel):
+    agg_level: str = "daily"
+
+def run_script(script_name: str, args: list = None):
+    script_path = os.path.join(SRC_DIR, script_name)
+    cmd = ["python", script_path]
+    if args:
+        cmd.extend(args)
+    
+    print(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR)
+    
+    if result.returncode != 0:
+        raise Exception(f"Lỗi khi chạy {script_name}:\n{result.stderr}")
+    return result.stdout
+
+@app.post("/api/run-pipeline")
+def api_run_pipeline(request: RunPipelineRequest):
+    agg_level = request.agg_level
+    if agg_level not in ["daily", "weekly"]:
+        raise HTTPException(status_code=400, detail="Invalid agg_level")
+        
+    try:
+        # Chạy tuần tự các script
+        run_script("00_generate_sample_data.py")
+        run_script("01_compute_sentiment.py")
+        run_script("02_prepare_cases.py")
+        run_script("03_merge_data.py", ["--agg-level", agg_level])
+        run_script("04_correlation.py", ["--agg-level", agg_level])
+        run_script("05_plot_temporal.py", ["--agg-level", agg_level])
+        run_script("06_plot_map.py", ["--agg-level", agg_level])
+        
+        return {"status": "success", "message": "Pipeline completed successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/results")
+def api_get_results(agg_level: str = "daily"):
+    """Trả về kết quả (Global Correlation, tên file ảnh)."""
+    global_corr_path = os.path.join(OUTPUT_DIR, f'global_correlation_{agg_level}.txt')
+    
+    global_corr_text = "N/A"
+    if os.path.exists(global_corr_path):
+        with open(global_corr_path, 'r') as f:
+            global_corr_text = f.read().strip()
+            
+    # Kiểm tra xem các ảnh đã được tạo chưa
+    temporal_img = f"temporal_correlation_{agg_level}.png"
+    spatial_img = f"spatial_correlation_map_{agg_level}.png"
+    
+    return {
+        "global_correlation": global_corr_text,
+        "temporal_image": f"/static/{temporal_img}" if os.path.exists(os.path.join(OUTPUT_DIR, temporal_img)) else None,
+        "spatial_image": f"/static/{spatial_img}" if os.path.exists(os.path.join(OUTPUT_DIR, spatial_img)) else None
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
