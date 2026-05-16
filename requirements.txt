@@ -6,3 +6,5 @@ textblob
 vaderSentiment
 geopandas
 requests
+fastapi
+uvicorn

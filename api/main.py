@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -30,12 +31,14 @@ class RunPipelineRequest(BaseModel):
 
 def run_script(script_name: str, args: list = None):
     script_path = os.path.join(SRC_DIR, script_name)
-    cmd = ["python", script_path]
+    cmd = [sys.executable, script_path]
     if args:
         cmd.extend(args)
     
     print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR)
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR, env=env, encoding="utf-8")
     
     if result.returncode != 0:
         raise Exception(f"Lỗi khi chạy {script_name}:\n{result.stderr}")
