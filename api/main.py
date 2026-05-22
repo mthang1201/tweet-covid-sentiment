@@ -35,15 +35,30 @@ def run_script(script_name: str, args: list = None):
     cmd = [sys.executable, script_path]
     if args:
         cmd.extend(args)
-    
-    print(f"Running: {' '.join(cmd)}")
+
+    print(f"\n=== Running {script_name} ===", flush=True)
+
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=BASE_DIR, env=env, encoding="utf-8")
-    
-    if result.returncode != 0:
-        raise Exception(f"Lỗi khi chạy {script_name}:\n{result.stderr}")
-    return result.stdout
+
+    process = subprocess.Popen(
+        cmd,
+        cwd=BASE_DIR,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        bufsize=1,
+    )
+
+    for line in process.stdout:
+        print(line, end="", flush=True)
+
+    process.wait()
+
+    if process.returncode != 0:
+        raise Exception(f"Lỗi khi chạy {script_name}")
 
 @app.post("/api/run-pipeline")
 def api_run_pipeline(request: RunPipelineRequest):
@@ -53,13 +68,19 @@ def api_run_pipeline(request: RunPipelineRequest):
         
     try:
         # Chạy tuần tự các script
-        run_script("00_generate_sample_data.py")
-        run_script("01_compute_sentiment.py")
-        run_script("02_prepare_cases.py")
-        run_script("03_merge_data.py", ["--agg-level", agg_level])
-        run_script("04_correlation.py", ["--agg-level", agg_level])
-        run_script("05_plot_temporal.py", ["--agg-level", agg_level])
-        run_script("06_plot_map.py", ["--agg-level", agg_level])
+        steps = [
+            ("01_compute_sentiment.py", []),
+            ("02_prepare_cases.py", []),
+            ("03_merge_data.py", ["--agg-level", agg_level]),
+            ("04_correlation.py", ["--agg-level", agg_level]),
+            ("05_plot_temporal.py", ["--agg-level", agg_level]),
+            ("06_plot_map.py", ["--agg-level", agg_level]),
+        ]
+
+        for i, (script, args) in enumerate(steps, start=1):
+            print(f"\n[{i}/{len(steps)}] Starting {script}", flush=True)
+            run_script(script, args)
+            print(f"[{i}/{len(steps)}] Finished {script}", flush=True)
         
         return {"status": "success", "message": "Pipeline completed successfully!"}
     except Exception as e:
@@ -87,4 +108,11 @@ def api_get_results(agg_level: str = "daily"):
 
 if __name__ == "__main__":
     # Use reload_dirs to only watch relevant directories and ignore venv
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=[os.path.dirname(__file__), SRC_DIR])
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_dirs=["api", "src"],
+        reload_excludes=["web/*", "web/node_modules/*", "venv/*", "outputs/*"],
+    )
