@@ -1,1 +1,1 @@
-Global Correlation: 0.02566394394713283
+Global Correlation: -0.024674818478491168

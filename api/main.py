@@ -67,10 +67,10 @@ def api_run_pipeline(request: RunPipelineRequest):
         raise HTTPException(status_code=400, detail="Invalid agg_level")
         
     try:
-        # Chạy tuần tự các script
+        # Run pipeline steps sequentially
         steps = [
             ("01_compute_sentiment.py", []),
-            ("02_prepare_cases.py", []),
+            ("02_prepare_tweet_metrics.py", []),
             ("03_merge_data.py", ["--agg-level", agg_level]),
             ("04_correlation.py", ["--agg-level", agg_level]),
             ("05_plot_temporal.py", ["--agg-level", agg_level]),
