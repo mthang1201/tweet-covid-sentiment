@@ -4,10 +4,11 @@ import random
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
+from tqdm import tqdm
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-GEOJSON_URL = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json"
-GEOJSON_PATH = os.path.join(DATA_DIR, 'counties.geojson')
+GEOJSON_URL = "https://raw.githubusercontent.com/evansd/uk-ceremonial-counties/master/uk-ceremonial-counties.geojson"
+GEOJSON_PATH = os.path.join(DATA_DIR, 'uk_counties.geojson')
 
 def download_geojson():
     """Tải GeoJSON với cơ chế caching và error handling."""
@@ -20,7 +21,7 @@ def download_geojson():
 
     print(f"Đang tải GeoJSON từ {GEOJSON_URL}...")
     try:
-        response = requests.get(GEOJSON_URL, timeout=10)
+        response = requests.get(GEOJSON_URL, timeout=30)
         response.raise_for_status() # Sinh lỗi nếu HTTP status code không phải 200
         
         with open(GEOJSON_PATH, 'w', encoding='utf-8') as f:
@@ -29,39 +30,32 @@ def download_geojson():
         return GEOJSON_PATH
     except requests.exceptions.RequestException as e:
         print(f"Lỗi khi tải GeoJSON: {e}")
-        # Không dùng sys.exit, trả về None để xử lý phía sau nếu cần
         return None
 
-def extract_fips_from_geojson(filepath):
-    """Trích xuất danh sách FIPS hợp lệ từ file GeoJSON."""
-    fips_list = []
+def extract_regions_from_geojson(filepath):
+    """Trích xuất danh sách county hợp lệ từ file GeoJSON UK ceremonial counties."""
+    region_list = []
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for feature in data.get('features', []):
-                fips = feature.get('id')
-                if fips:
-                    fips_list.append(str(fips).zfill(5))
+                region_name = feature.get('properties', {}).get('county')
+                if region_name:
+                    region_list.append(region_name)
     except Exception as e:
         print(f"Lỗi đọc GeoJSON: {e}")
-    return fips_list
+    return region_list
 
-def generate_covid_cases(fips_list, start_date, end_date):
+def generate_covid_cases(region_list, start_date, end_date):
     """Tạo dữ liệu COVID-19 giả lập."""
-    print("Đang tạo covid_confirmed_usafacts.csv...")
+    print("Đang tạo covid_confirmed_uk.csv...")
     date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     
     data = []
-    for fips in fips_list:
-        county_name = f"County {fips}"
-        state_name = "State"
-        statefips = fips[:2]
-        
+    for region in tqdm(region_list, desc="Generating cases"):
         row = {
-            "countyFIPS": int(fips),
-            "County Name": county_name,
-            "State": state_name,
-            "StateFIPS": int(statefips)
+            "county_name": region,
+            "Country": "UK"
         }
         
         # Tạo cumulative cases (ca bệnh cộng dồn luôn tăng dần)
@@ -76,86 +70,25 @@ def generate_covid_cases(fips_list, start_date, end_date):
         data.append(row)
         
     df = pd.DataFrame(data)
-    df.to_csv(os.path.join(DATA_DIR, 'covid_confirmed_usafacts.csv'), index=False)
-    print("Đã tạo xong covid_confirmed_usafacts.csv")
+    df.to_csv(os.path.join(DATA_DIR, 'covid_confirmed_uk.csv'), index=False)
+    print("Đã tạo xong covid_confirmed_uk.csv")
 
-def generate_covid_population(fips_list):
+def generate_covid_population(region_list):
     """Tạo dữ liệu dân số giả lập."""
-    print("Đang tạo covid_county_population_usafacts.csv...")
+    print("Đang tạo covid_uk_population.csv...")
     data = []
-    for fips in fips_list:
-        county_name = f"County {fips}"
-        state_name = "State"
-        
+    for region in tqdm(region_list, desc="Generating population"):
         row = {
-            "countyFIPS": int(fips),
-            "County Name": county_name,
-            "State": state_name,
+            "county_name": region,
+            "Country": "UK",
             "population": random.randint(10000, 1000000)
         }
         data.append(row)
         
     df = pd.DataFrame(data)
-    df.to_csv(os.path.join(DATA_DIR, 'covid_county_population_usafacts.csv'), index=False)
-    print("Đã tạo xong covid_county_population_usafacts.csv")
+    df.to_csv(os.path.join(DATA_DIR, 'covid_uk_population.csv'), index=False)
+    print("Đã tạo xong covid_uk_population.csv")
 
-def generate_tweets(fips_list, start_date, end_date, num_tweets=5000):
-    """Tạo dữ liệu tweet giả lập có nhiễu thời gian."""
-    print("Đang tạo tweets.csv...")
-    start_dt = pd.to_datetime(start_date)
-    end_dt = pd.to_datetime(end_date)
-    delta = end_dt - start_dt
-    
-    # Một số format thời gian có nhiễu để test pipeline
-    time_formats = [
-        "%Y-%m-%d %H:%M:%S",          # Không có timezone (naive)
-        "%Y-%m-%dT%H:%M:%S%z",        # Có timezone UTC (VD: +0000)
-        "%Y-%m-%d %H:%M:%S%z",        # Có timezone khác (VD: -0500)
-        "%Y-%m-%dT%H:%M:%SZ"          # ISO format UTC (Z)
-    ]
-    
-    timezones = ["+0000", "-0500", "-0800", "+0700"]
-    
-    sample_texts = [
-        "covid is getting worse here",
-        "finally recovered from covid",
-        "wearing masks is important",
-        "i hate lockdown",
-        "cases are dropping, great news!",
-        "hospital is full, very sad.",
-        "vaccine is working well",
-        "this pandemic will never end"
-    ]
-    
-    data = []
-    for i in range(1, num_tweets + 1):
-        # Random thời gian trong khoảng start - end
-        random_seconds = random.randint(0, int(delta.total_seconds()))
-        tweet_dt = start_dt + timedelta(seconds=random_seconds)
-        
-        fmt = random.choice(time_formats)
-        tz = random.choice(timezones)
-        
-        if '%z' in fmt:
-            created_at = tweet_dt.strftime(fmt.replace('%z', tz))
-        elif 'Z' in fmt:
-            created_at = tweet_dt.strftime(fmt)
-        else:
-            created_at = tweet_dt.strftime(fmt)
-            
-        row = {
-            "tweet_id": i,
-            "created_at": created_at,
-            "text": random.choice(sample_texts),
-            "county_fips": int(random.choice(fips_list)),
-            "is_retweet": random.choice(["true", "false", "false", "false"]), # 25% là retweet
-            "user_type": random.choice(["person", "person", "organization", "bot"])
-        }
-        data.append(row)
-        
-    df = pd.DataFrame(data)
-    df.to_csv(os.path.join(DATA_DIR, 'tweets.csv'), index=False)
-    print("Đã tạo xong tweets.csv")
 
 if __name__ == "__main__":
     geojson_path = download_geojson()
@@ -163,19 +96,18 @@ if __name__ == "__main__":
         print("Không thể tiếp tục do không tải được GeoJSON.")
         exit(1)
         
-    fips_list = extract_fips_from_geojson(geojson_path)
-    if not fips_list:
-        print("Không tìm thấy mã FIPS nào trong GeoJSON.")
+    region_list = extract_regions_from_geojson(geojson_path)
+    if not region_list:
+        print("Không tìm thấy region (county) nào trong GeoJSON.")
         exit(1)
         
-    # Giới hạn số lượng FIPS để tạo dữ liệu nhanh hơn (lấy 100 county ngẫu nhiên)
-    sample_fips = random.sample(fips_list, min(100, len(fips_list)))
+    # Tạo dữ liệu cho tất cả các counties
+    sample_regions = region_list
     
     START_DATE = '2020-03-01'
     END_DATE = '2020-12-31'
     
-    generate_covid_cases(sample_fips, START_DATE, END_DATE)
-    generate_covid_population(sample_fips)
-    generate_tweets(sample_fips, START_DATE, END_DATE, num_tweets=10000)
+    generate_covid_cases(region_list, START_DATE, END_DATE)
+    generate_covid_population(region_list)
     
-    print("HOÀN THÀNH tạo dữ liệu mẫu!")
+    print("HOÀN THÀNH tạo dữ liệu mẫu cho UK!")

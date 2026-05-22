@@ -39,7 +39,7 @@ def compute_correlations(agg_level):
     temporal_corr.to_csv(os.path.join(OUTPUT_DIR, f'temporal_correlation_{agg_level}.csv'), index=False)
     
     print("3. Đang tính Spatial Correlation (theo không gian/county)...")
-    spatial_corr = df.groupby('county_fips').apply(
+    spatial_corr = df.groupby('county_name').apply(
         lambda g: safe_pearson(g['sentiment_score'], g['cases_metric'])
     ).reset_index(name='correlation')
     spatial_corr = spatial_corr.dropna(subset=['correlation'])
@@ -56,7 +56,7 @@ def compute_correlations(agg_level):
     for wave_name, (start_dt, end_dt) in waves.items():
         wave_df = df[(df['period'] >= start_dt) & (df['period'] <= end_dt)]
         if len(wave_df) > 0:
-            wave_corr = wave_df.groupby('county_fips').apply(
+            wave_corr = wave_df.groupby('county_name').apply(
                 lambda g: safe_pearson(g['sentiment_score'], g['cases_metric'])
             ).reset_index(name='correlation')
             wave_corr = wave_corr.dropna(subset=['correlation'])

@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import uvicorn
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -85,5 +86,5 @@ def api_get_results(agg_level: str = "daily"):
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Use reload_dirs to only watch relevant directories and ignore venv
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=[os.path.dirname(__file__), SRC_DIR])

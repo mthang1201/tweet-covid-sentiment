@@ -24,37 +24,31 @@ def plot_map(agg_level, wave=None):
         print(f"Không tìm thấy file {input_file}. Vui lòng chạy 04_correlation.py trước.")
         return
         
-    df['county_fips'] = df['county_fips'].astype(str).str.zfill(5)
+    # Chuyển đổi ID để map với county_name
+    df['county_name'] = df['county_name'].astype(str)
     
     # Load GeoJSON
-    geojson_path = os.path.join(DATA_DIR, 'counties.geojson')
+    geojson_path = os.path.join(DATA_DIR, 'uk_counties.geojson')
     try:
         gdf = gpd.read_file(geojson_path)
     except Exception as e:
         print(f"Lỗi đọc GeoJSON {geojson_path}: {e}")
         return
         
-    # Trích xuất FIPS từ file GeoJSON (tùy định dạng, plotly geojson-counties-fips.json có id)
-    if 'id' in gdf.columns:
-        gdf['county_fips'] = gdf['id'].astype(str).str.zfill(5)
-    elif 'FIPS' in gdf.columns:
-        gdf['county_fips'] = gdf['FIPS'].astype(str).str.zfill(5)
-    elif 'GEOID' in gdf.columns:
-        gdf['county_fips'] = gdf['GEOID'].astype(str).str.zfill(5)
+    # Trích xuất county name từ file GeoJSON (UK ceremonial counties dùng 'county')
+    if 'county' in gdf.columns:
+        gdf['county_name'] = gdf['county'].astype(str)
+    elif 'LAD13NM' in gdf.columns:
+        gdf['county_name'] = gdf['LAD13NM'].astype(str)
     else:
-        print("Không tìm thấy cột chứa FIPS/ID trong GeoJSON!")
+        print("Không tìm thấy cột chứa tên county trong GeoJSON!")
         return
         
-    # Giới hạn bản đồ ở vùng nội địa Mỹ (Continental US) để tránh bản đồ bị méo
-    # Giữ lại các FIPS không thuộc HI (15), AK (02), PR (72), VI (78), v.v.
-    non_conus_states = ['02', '15', '60', '66', '69', '72', '74', '78']
-    gdf = gdf[~gdf['county_fips'].str[:2].isin(non_conus_states)]
-    
     # Merge dữ liệu correlation vào gdf
-    merged_gdf = gdf.merge(df, on='county_fips', how='left')
+    merged_gdf = gdf.merge(df, on='county_name', how='left')
     
     # Vẽ bản đồ
-    fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+    fig, ax = plt.subplots(1, 1, figsize=(15, 15)) # Tăng kích thước height cho UK map
     
     # Nền cho các county không có dữ liệu (màu xám)
     gdf.plot(ax=ax, color='lightgrey', edgecolor='white', linewidth=0.1)

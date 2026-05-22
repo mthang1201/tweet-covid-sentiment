@@ -24,7 +24,7 @@ def plot_temporal(agg_level):
     # Vẽ đường ngang y=0 để dễ nhìn
     plt.axhline(0, color='red', linestyle='--', alpha=0.5)
     
-    plt.title(f'Temporal Correlation between Tweet Sentiment and COVID-19 Cases ({agg_level.capitalize()})')
+    plt.title(f'Temporal Correlation between Tweet Sentiment and COVID-19 Cases in the UK ({agg_level.capitalize()})')
     plt.xlabel('Time (Period)')
     plt.ylabel('Pearson Correlation (r)')
     plt.grid(True, alpha=0.3)

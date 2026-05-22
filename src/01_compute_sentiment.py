@@ -1,71 +1,87 @@
 import os
+import glob
 import pandas as pd
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from tqdm import tqdm
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'outputs')
 
-def load_and_filter_tweets(filepath):
-    print(f"Đang tải dữ liệu từ {filepath}...")
-    try:
-        df = pd.read_csv(filepath)
-    except FileNotFoundError:
-        print(f"Không tìm thấy file {filepath}. Vui lòng chạy script 00_generate_sample_data.py trước.")
-        return None
-
-    initial_count = len(df)
+def process_uk_tweets():
+    print("Đang xử lý dữ liệu TSV của UK...")
+    tsv_files = glob.glob(os.path.join(DATA_DIR, 'united_kingdom_*.tsv'))
     
-    # 1. Bỏ retweet (chú ý kiểu dữ liệu có thể là string 'true' hoặc bool True)
-    df = df[~df['is_retweet'].astype(str).str.lower().isin(['true', '1', 'yes'])]
-    
-    # 2. Chỉ giữ user_type = person
-    if 'user_type' in df.columns:
-        df = df[df['user_type'].astype(str).str.lower() == 'person']
+    if not tsv_files:
+        print("Không tìm thấy file united_kingdom_*.tsv nào trong thư mục data.")
+        return
         
-    # 3. Chỉ giữ tweet có county_fips
-    df = df.dropna(subset=['county_fips'])
+    output_file = os.path.join(OUTPUT_DIR, 'tweets_with_sentiment.csv')
     
-    # Chuẩn hóa county_fips thành integer rồi thành string độ dài 5 (để match chuẩn FIPS)
-    df['county_fips'] = df['county_fips'].astype(int).astype(str).str.zfill(5)
-    
-    # 4. Parse `created_at` thành date (loại bỏ nhiễu múi giờ)
-    # Dùng utc=True để parse tất cả các múi giờ về UTC chuẩn, sau đó ép kiểu timezone-naive nếu cần
-    df['created_at'] = pd.to_datetime(df['created_at'], utc=True, format='mixed', errors='coerce')
-    
-    # Loại bỏ các dòng không parse được ngày giờ
-    df = df.dropna(subset=['created_at'])
-    
-    # Lấy ngày (date) chuẩn theo UTC
-    df['date'] = df['created_at'].dt.date
-    
-    filtered_count = len(df)
-    print(f"Lọc tweet: {initial_count} -> {filtered_count} tweets.")
-    
-    return df
-
-def compute_sentiment(df):
-    print("Đang tính toán sentiment bằng VADER...")
-    analyzer = SentimentIntensityAnalyzer()
-    
-    def get_vader_score(text):
-        if not isinstance(text, str):
-            return 0.0
-        return analyzer.polarity_scores(text)['compound']
+    # Xóa file output cũ nếu tồn tại
+    if os.path.exists(output_file):
+        os.remove(output_file)
         
-    df['sentiment_score'] = df['text'].apply(get_vader_score)
-    return df
+    total_processed = 0
+    total_kept = 0
+    
+    columns_to_read = [
+        'tweet_id', 'date_time', 'retweeted_id', 'user_type', 
+        'sentiment_label', 'geo_county', 'place_county', 'user_loc_county'
+    ]
+    
+    first_chunk = True
+    
+    for filepath in sorted(tsv_files):
+        print(f"Đang đọc file: {os.path.basename(filepath)}")
+        
+        # Đọc theo chunk để tránh OOM
+        try:
+            chunk_iter = pd.read_csv(
+                filepath, 
+                sep='\t', 
+                chunksize=100000, 
+                usecols=columns_to_read,
+                dtype={'retweeted_id': str} # Để dễ check null
+            )
+        except Exception as e:
+            print(f"Lỗi đọc file {filepath}: {e}")
+            continue
+            
+        for chunk in tqdm(chunk_iter, desc=f"Processing {os.path.basename(filepath)}"):
+            total_processed += len(chunk)
+            
+            # 1. Bỏ retweet (nếu retweeted_id có giá trị tức là retweet)
+            chunk = chunk[chunk['retweeted_id'].isna()]
+            
+            # 2. Chỉ giữ user_type = PER (person)
+            if 'user_type' in chunk.columns:
+                chunk = chunk[chunk['user_type'].astype(str).str.upper() == 'PER']
+                
+            # 3. Lấy county name (ưu tiên geo_county -> place_county -> user_loc_county)
+            chunk['county_name'] = chunk['geo_county'].fillna(chunk['place_county']).fillna(chunk['user_loc_county'])
+            chunk = chunk.dropna(subset=['county_name'])
+            chunk = chunk[chunk['county_name'] != 'UNK']
+            
+            # 4. Parse ngày
+            chunk['date_time'] = pd.to_datetime(chunk['date_time'], errors='coerce')
+            chunk = chunk.dropna(subset=['date_time'])
+            chunk['date'] = chunk['date_time'].dt.date
+            
+            # 5. Lấy sentiment
+            # sentiment_label đã có sẵn (-1, 0, 1), ta dùng nó làm sentiment_score
+            chunk['sentiment_score'] = chunk['sentiment_label']
+            
+            # Giữ lại các cột cần thiết
+            final_chunk = chunk[['tweet_id', 'date', 'county_name', 'sentiment_score']]
+            total_kept += len(final_chunk)
+            
+            # Ghi ra file
+            final_chunk.to_csv(output_file, mode='a', index=False, header=first_chunk)
+            first_chunk = False
+            
+    print(f"Xử lý hoàn tất. Tổng số tweet đã đọc: {total_processed}. Tổng số tweet hợp lệ giữ lại: {total_kept}.")
+    print(f"Đã lưu kết quả vào {output_file}")
 
 if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    tweets_file = os.path.join(DATA_DIR, 'tweets.csv')
-    
-    df_tweets = load_and_filter_tweets(tweets_file)
-    
-    if df_tweets is not None and not df_tweets.empty:
-        df_sentiment = compute_sentiment(df_tweets)
-        
-        output_file = os.path.join(OUTPUT_DIR, 'tweets_with_sentiment.csv')
-        df_sentiment.to_csv(output_file, index=False)
-        print(f"Đã lưu kết quả sentiment vào {output_file}")
-    else:
-        print("Không có dữ liệu tweet hợp lệ sau khi lọc.")
+    process_uk_tweets()
+

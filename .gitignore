@@ -1,0 +1,5 @@
+.DS_Store
+data/
+venv/
+web/.vite/
+outputs/
