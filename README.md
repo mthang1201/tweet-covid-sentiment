@@ -19,7 +19,7 @@ Mở một terminal mới và chạy:
 
 ```bash
 # Tạo môi trường ảo (nếu chưa có)
-python -m venv venv
+python3 -m venv venv
 
 # Kích hoạt môi trường
 # Trên Windows:
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 pip install -r api_requirements.txt
 
 # Khởi chạy server
-python api/main.py
+python3 api/main.py
 ```
 *Server sẽ chạy ở địa chỉ: `http://localhost:8000`*
 
