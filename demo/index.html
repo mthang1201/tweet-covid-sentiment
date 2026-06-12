@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Static demo dashboard for COVID-19 tweet sentiment and case correlation outputs."
+    />
+    <title>COVID-19 Sentiment Dashboard Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-activity" viewBox="0 0 24 24">
+        <path d="M22 12h-4l-3 8L9 4l-3 8H2" />
+      </symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24">
+        <path d="M3 3v18h18" />
+        <path d="M8 17V9" />
+        <path d="M13 17V5" />
+        <path d="M18 17v-4" />
+      </symbol>
+      <symbol id="icon-map" viewBox="0 0 24 24">
+        <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+        <path d="M9 3v15" />
+        <path d="M15 6v15" />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7-11-7z" />
+      </symbol>
+      <symbol id="icon-github" viewBox="0 0 24 24">
+        <path
+          d="M15 22v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.1-1.5 6.1-6.7a5.2 5.2 0 0 0-1.4-3.6 4.8 4.8 0 0 0-.1-3.6s-1.1-.4-3.7 1.4a12.6 12.6 0 0 0-6.7 0C5.7.2 4.6.6 4.6.6a4.8 4.8 0 0 0-.1 3.6 5.2 5.2 0 0 0-1.4 3.6c0 5.2 3.1 6.4 6.1 6.7a3 3 0 0 0-.9 2.1V22"
+        />
+        <path d="M9 18c-3.3 1-3.3-1.6-4.6-2" />
+      </symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="5" rx="8" ry="3" />
+        <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+        <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </symbol>
+    </svg>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Dashboard controls">
+        <section class="panel intro-panel">
+          <h1>COVID-19 Sentiment</h1>
+          <p class="subtitle">
+            Phân tích tương quan giữa thái độ trên Twitter/X và số ca nhiễm COVID-19 theo
+            thời gian thực.
+          </p>
+
+          <div class="toggle-group" role="tablist" aria-label="Aggregation level">
+            <button class="btn-toggle active" type="button" data-level="daily" role="tab" aria-selected="true">
+              Daily
+            </button>
+            <button class="btn-toggle" type="button" data-level="weekly" role="tab" aria-selected="false">
+              Weekly
+            </button>
+          </div>
+
+          <button class="btn-run" type="button" id="runPipelineBtn">
+            <svg class="icon" aria-hidden="true"><use href="#icon-play" /></svg>
+            Run Pipeline
+          </button>
+        </section>
+      </aside>
+
+      <main class="results-area">
+        <section class="metric-strip panel" aria-label="Global correlation">
+          <div>
+            <div class="section-label">
+              <svg class="icon accent-blue" aria-hidden="true"><use href="#icon-activity" /></svg>
+              Global Correlation (r)
+            </div>
+            <p class="metric-label">Pearson correlation trên toàn bộ dataset</p>
+          </div>
+          <output class="metric-value" id="globalCorrelation">-0.0247</output>
+        </section>
+
+        <section class="panel chart-panel">
+          <header class="section-header">
+            <div class="section-label">
+              <svg class="icon accent-violet" aria-hidden="true"><use href="#icon-chart" /></svg>
+              Temporal Correlation
+            </div>
+          </header>
+          <figure class="chart-frame chart-frame-wide">
+            <img
+              id="temporalImage"
+              src="./assets/temporal_correlation_daily.png"
+              alt="Daily temporal correlation chart"
+              loading="eager"
+            />
+          </figure>
+        </section>
+
+        <section class="panel chart-panel">
+          <header class="section-header">
+            <div class="section-label">
+              <svg class="icon accent-green" aria-hidden="true"><use href="#icon-map" /></svg>
+              Spatial Correlation Map (Continental US)
+            </div>
+          </header>
+          <figure class="chart-frame chart-frame-map">
+            <img
+              id="spatialImage"
+              src="./assets/spatial_correlation_map_daily.png"
+              alt="Daily spatial correlation map for the continental United States"
+              loading="lazy"
+            />
+          </figure>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="pipelineModal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" type="button" id="closeModalBtn" aria-label="Close dialog">
+          <svg class="icon" aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+        <p class="eyebrow">Manual run required</p>
+        <h2 id="modalTitle">Pipeline không chạy trực tiếp trên bản demo tĩnh</h2>
+        <p>
+          Để tạo output mới, hãy mở GitHub repo, tải dataset từ TB-COV, đặt dữ liệu vào project
+          theo hướng dẫn trong README rồi chạy pipeline trên máy local.
+        </p>
+        <div class="modal-actions">
+          <a class="primary-link" href="https://github.com/mthang1201/tweet-covid-sentiment" target="_blank" rel="noreferrer">
+            <svg class="icon" aria-hidden="true"><use href="#icon-github" /></svg>
+            Open GitHub repo
+          </a>
+          <a class="secondary-link" href="https://crisisnlp.qcri.org/tbcov" target="_blank" rel="noreferrer">
+            <svg class="icon" aria-hidden="true"><use href="#icon-database" /></svg>
+            Open TB-COV dataset
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
