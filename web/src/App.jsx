@@ -23,7 +23,7 @@ function App() {
     }
   }
 
-  // Tải kết quả cũ nếu có khi mới mở app
+  // Tải kết quả cũ nếu có khi mới mở app (hoặc khi đổi aggLevel)
   useEffect(() => {
     fetchResults(aggLevel)
   }, [aggLevel])
@@ -69,37 +69,25 @@ function App() {
           <p className="subtitle">
             Phân tích tương quan giữa thái độ trên Twitter/X và số ca nhiễm COVID-19 theo thời gian thực.
           </p>
-          
-          <div className="control-group">
-            <div className="control-label">Mức độ tập hợp (Aggregation)</div>
-            <div className="radio-group">
-              <div className="radio-option">
-                <input 
-                  type="radio" 
-                  id="daily" 
-                  name="agg" 
-                  value="daily" 
-                  checked={aggLevel === 'daily'}
-                  onChange={(e) => setAggLevel(e.target.value)}
-                  disabled={loading}
-                />
-                <label htmlFor="daily">Daily</label>
-              </div>
-              <div className="radio-option">
-                <input 
-                  type="radio" 
-                  id="weekly" 
-                  name="agg" 
-                  value="weekly"
-                  checked={aggLevel === 'weekly'}
-                  onChange={(e) => setAggLevel(e.target.value)}
-                  disabled={loading}
-                />
-                <label htmlFor="weekly">Weekly</label>
-              </div>
-            </div>
+
+          {/* Daily / Weekly Toggle */}
+          <div className="toggle-group">
+            <button
+              className={`btn-toggle ${aggLevel === 'daily' ? 'active' : ''}`}
+              onClick={() => setAggLevel('daily')}
+              disabled={loading}
+            >
+              Daily
+            </button>
+            <button
+              className={`btn-toggle ${aggLevel === 'weekly' ? 'active' : ''}`}
+              onClick={() => setAggLevel('weekly')}
+              disabled={loading}
+            >
+              Weekly
+            </button>
           </div>
-          
+
           <button 
             className="btn-run" 
             onClick={runPipeline} 
